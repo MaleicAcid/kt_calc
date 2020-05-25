@@ -1,2 +1,8 @@
 .git/
 .idea/
+
+__pycache__/
+build/
+dist/
+
+viewtxt.exe
