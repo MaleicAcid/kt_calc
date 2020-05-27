@@ -33,9 +33,10 @@ conn = pymysql.connect(host=db['host'], port=db['port'], user=db['user'], passwd
 cur=conn.cursor()#获取游标
 
 substr = "$AGHTD"
-attention = ["$AGHTD"]
+attention = ["$AGHTD", "$TIROT"]
 table_dict = {}
 table_dict["$AGHTD"] = "autopilothtd"
+table_dict["$TIROT"] = "rot"
 cancel_strict_sql = "set global sql_mode=''"
 cur.execute(cancel_strict_sql)
 # 2020-05-21 11-26-59$AGHTD,V,2.3,R,S,T,15.0,10.0,,10.00,125.0,,,T,A,A,,123.09*1F
@@ -53,8 +54,8 @@ def insert_into(tablename, formatnum, arr):
 	format_str = "%s,"*formatnum
 	format_str = format_str[:-1]
 	sql = "insert into " + tablename + " values(" + format_str+ ")"
-	#print(sql)
-	#print(line_arr)
+	# print(sql)
+	# print(arr)
 	insert = cur.execute(sql, tuple(arr))
 	return insert
 def data_change(str):
@@ -91,8 +92,8 @@ def import_per_file(filename):
 		if protocol in attention:
 			line_arr = line.split(",")
 			line_arr[0] = line_arr[0].split("$")[0]
-			line_arr[0] = data_change(line_arr[0])
-			line_arr[-1] = line_arr[-1][:-3]
+			line_arr[0] = data_change(line_arr[0]) # 日期转换
+			line_arr[-1] = line_arr[-1].split("*")[0]
 			size = len(line_arr)
 			tmp = 0
 			try:
