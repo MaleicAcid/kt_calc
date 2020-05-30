@@ -2,7 +2,7 @@ from datetime import datetime
 import pymysql
 import os
 from six.moves import configparser
-
+from sql_comm import table_dict, create_table_sql
 # 创建连接
 db = {}
 # db['host'] = '127.0.0.1'
@@ -30,13 +30,20 @@ print("your target_dir: %s " % (target_dir))
 conn = pymysql.connect(host=db['host'], port=db['port'], user=db['user'], passwd=db['passwd'], db=db['db'])
 
 # 创建游标
-cur=conn.cursor()#获取游标
+cur = conn.cursor()#获取游标
 
-substr = "$AGHTD"
-attention = ["$AGHTD", "$TIROT"]
-table_dict = {}
-table_dict["$AGHTD"] = "autopilothtd"
-table_dict["$TIROT"] = "rot"
+# attention = {
+#  	"$AGHTD": 0,
+#  	"$TIROT": 0,
+#  	"$IIHRM": 0,
+#  	"$WIMWV": 0,
+#  	"$GPRMC": 0
+# }
+
+attention = {
+ 	"$GPRMC": 0
+}
+
 cancel_strict_sql = "set global sql_mode=''"
 cur.execute(cancel_strict_sql)
 # 2020-05-21 11-26-59$AGHTD,V,2.3,R,S,T,15.0,10.0,,10.00,125.0,,,T,A,A,,123.09*1F
@@ -49,19 +56,22 @@ class IncorrectProtocolException(Exception):
     def __str__(self):
         return "filename:"+str(self.filename)+", 文件格式错误, 已跳过"
 
-def insert_into(tablename, formatnum, arr):
+def insert_into(protocol, tablename, formatnum, arr):
+	if (attention[protocol] == 0) :
+		cur.execute(create_table_sql[protocol])
+		attention[protocol] = 1
 
 	format_str = "%s,"*formatnum
 	format_str = format_str[:-1]
 	sql = "insert into " + tablename + " values(" + format_str+ ")"
 	# print(sql)
 	# print(arr)
+
 	insert = cur.execute(sql, tuple(arr))
 	return insert
 def data_change(str):
 	obj = datetime.strptime(str, '%Y-%m-%d %H-%M-%S')
 	return obj.strftime('%Y-%m-%d %H:%M:%S')
-
 
 def run(dir):
 	fileList = os.listdir(dir)
@@ -97,12 +107,19 @@ def import_per_file(filename):
 			size = len(line_arr)
 			tmp = 0
 			try:
-				tmp = insert_into(table_dict[protocol], len(line_arr), line_arr)
+				tmp = insert_into(protocol, table_dict[protocol], len(line_arr), line_arr)
 			except pymysql.err.IntegrityError as e:
-				if(e.args[0] == 1062):
+				if(e.args[0] == 1062): # 1062错误代表重复插入
 					tmp = 0
 				else:
-					raise(e)
+					raise (e)
+			except pymysql.err.InternalError as e:
+				if(e.args[0] == 1136): # 1062错误代表参数数目不匹配
+					print("遇到一行数据错误, 已经跳过", line_arr)
+				else:
+					raise (e)
+
+
 			file_count+=tmp
 			global count
 			count += tmp
