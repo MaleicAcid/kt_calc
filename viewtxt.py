@@ -1,6 +1,9 @@
+
+#
 from datetime import datetime
 import pymysql
 import os
+import time
 from six.moves import configparser
 from sql_comm import table_dict, create_table_sql
 # 创建连接
@@ -32,23 +35,27 @@ conn = pymysql.connect(host=db['host'], port=db['port'], user=db['user'], passwd
 # 创建游标
 cur = conn.cursor()#获取游标
 
-# attention = {
-#  	"$AGHTD": 0,
-#  	"$TIROT": 0,
-#  	"$IIHRM": 0,
-#  	"$WIMWV": 0,
-#  	"$GPRMC": 0
-# }
-
 attention = {
+ 	"$AGHTD": 0,
+ 	"$TIROT": 0,
+ 	"$IIHRM": 0,
+ 	"$WIMWV": 0,
  	"$GPRMC": 0
 }
 
-cancel_strict_sql = "set global sql_mode=''"
-cur.execute(cancel_strict_sql)
-# 2020-05-21 11-26-59$AGHTD,V,2.3,R,S,T,15.0,10.0,,10.00,125.0,,,T,A,A,,123.09*1F
-count = 0
+# attention = {
+#  	"$GPRMC": 0
+# }
 
+#cancel_strict_sql = '''set global sql_mode='NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION';'''
+cancel_strict_sql1 = '''set @@global.sql_mode ='';'''
+cancel_strict_sql2 = '''set @@sql_mode ='';'''
+
+cur.execute(cancel_strict_sql1)
+cur.execute(cancel_strict_sql2)
+# 2020-05-21 11-26-59$AGHTD,V,2.3,R,S,T,15.0,10.0,,10.00,125.0,,,T,A,A,,123.09*1F
+count = 0 # 成功插入的计数
+line_err_num = 0 # 错误的行数计数
 class IncorrectProtocolException(Exception):
     "this is user's Exception for check the Protocol format"
     def __init__(self, filename):
@@ -116,6 +123,8 @@ def import_per_file(filename):
 			except pymysql.err.InternalError as e:
 				if(e.args[0] == 1136): # 1062错误代表参数数目不匹配
 					print("遇到一行数据错误, 已经跳过", line_arr)
+					global line_err_num
+					line_err_num += 1
 				else:
 					raise (e)
 
@@ -129,5 +138,7 @@ def import_per_file(filename):
 
 run(target_dir)
 print("insert nums:", count)
+print("line_err_num nums(跳过的失败行数):", line_err_num)
+
 print(" 按任意键即可关闭...", end='')
 input()
